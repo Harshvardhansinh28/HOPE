@@ -1,0 +1,149 @@
+{
+  "name": "HACKVERSE Agentic Security Extended",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Webhook Trigger - Security Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "security-event-webhook",
+      "httpMethod": "POST",
+      "path": "hackverse-security-event",
+      "options": {}
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://localhost:8000/api/v1/threats/detect",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ $json }}"
+      },
+      "name": "Call Ensemble Detector",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [550, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const res = $json;\n// extract per-technique results\nconst per = res.per_technique || [];\nitems = per.map(p => ({ json: p }));\nreturn items;"
+      },
+      "name": "Split per-technique",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json[\"score\"] }}",
+              "value2": 0.7,
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "name": "High Risk?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "message": "🚨 *Threat Detected by {{$json[\"technique\"]}}*\nScore: {{$json[\"score\"]}}\nDetails: {{$json[\"details\"]}}",
+        "channel": "#security-alerts"
+      },
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1300, 220]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://YOUR_EDR_API/isolate-endpoint",
+        "jsonParameters": true,
+        "bodyParametersJson": "={\"endpointId\":\"{{$json[\"details\"].endpoint || $json[\"details\"].ip}}\",\"reason\":\"Automated: {{$json[\"technique\"]}} threat\"}"
+      },
+      "name": "Isolate via EDR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [1300, 380]
+    },
+    {
+      "parameters": {
+        "resource": "incident",
+        "operation": "create",
+        "title": "Automated Threat Incident: {{$json[\"technique\"]}}",
+        "description": "{{$json | json}}",
+        "assignee": "security_team"
+      },
+      "name": "Open Incident",
+      "type": "n8n-nodes-base.servicenow",
+      "typeVersion": 1,
+      "position": [1300, 520]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger - Security Event": {
+      "main": [
+        [
+          {
+            "node": "Call Ensemble Detector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Ensemble Detector": {
+      "main": [
+        [
+          {
+            "node": "Split per-technique",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split per-technique": {
+      "main": [
+        [
+          {
+            "node": "High Risk?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Risk?": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Isolate via EDR",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Open Incident",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  }
+}

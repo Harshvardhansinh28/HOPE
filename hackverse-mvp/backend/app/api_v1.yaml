@@ -1,0 +1,13 @@
+openapi: '3.0.0'
+info:
+  title: HACKVERSE API
+  version: '1.0'
+paths:
+  /api/v1/threats/detect:
+    post:
+      description: Detect threat from event
+      requestBody:
+        required: true
+      responses:
+        '200':
+          description: detection result

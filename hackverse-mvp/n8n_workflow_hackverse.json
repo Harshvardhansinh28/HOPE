@@ -1,0 +1,69 @@
+{
+  "name": "HACKVERSE Agentic Security Workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Webhook Trigger - Security Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "security-event-webhook",
+      "httpMethod": "POST",
+      "path": "hackverse-security-event",
+      "options": {}
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://localhost:8000/api/v1/threats/detect",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ $json }}"
+      },
+      "name": "Call HACKVERSE Threat detector API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [550, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json[\"is_threat\"] }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "IF Threat Detected?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger - Security Event": {
+      "main": [
+        [
+          {
+            "node": "Call HACKVERSE Threat detector API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call HACKVERSE Threat detector API": {
+      "main": [
+        [
+          {
+            "node": "IF Threat Detected?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
